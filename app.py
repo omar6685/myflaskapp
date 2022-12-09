@@ -78,7 +78,10 @@ class RegisterForm(Form):
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm(request.form)
-    if request.method == 'POST' and form.validate():
+    
+    if is_logged_in:
+        return render_template('home.html')
+    elif request.method == 'POST' and form.validate():
         name = form.name.data
         email = form.email.data
         username = form.username.data
@@ -107,7 +110,10 @@ def register():
 # User login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
+    if is_logged_in:
+        return render_template('home.html')
+
+    elif request.method == 'POST':
         # Get Form Fields
         username = request.form['username']
         password_candidate = request.form['password']
@@ -139,6 +145,7 @@ def login():
         else:
             error = 'Username not found'
             return render_template('login.html', error=error)
+    
 
     return render_template('login.html')
 
@@ -177,6 +184,16 @@ def dashboard():
         return render_template('dashboard.html', msg=msg)
     # Close connection
     cur.close()
+
+
+
+# Logout
+@app.route('/logout')
+@is_logged_in
+def logout():
+    session.clear()
+    flash('You are now logged out', 'success')
+    return redirect(url_for('login'))
 
 
 
