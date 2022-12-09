@@ -156,6 +156,30 @@ def is_logged_in(f):
 
 
 
+# Dashboard
+@app.route('/dashboard')
+@is_logged_in
+def dashboard():
+    # Create cursor
+    cur = mysql.connection.cursor()
+
+    # Get articles
+    #result = cur.execute("SELECT * FROM articles")
+    # Show articles only from the user logged in 
+    result = cur.execute("SELECT * FROM articles WHERE author = %s", [session['username']])
+
+    articles = cur.fetchall()
+
+    if result > 0:
+        return render_template('dashboard.html', articles=articles)
+    else:
+        msg = 'No Articles Found'
+        return render_template('dashboard.html', msg=msg)
+    # Close connection
+    cur.close()
+
+
+
 if __name__ == '__main__':
     app.secret_key='secret123'
     app.run(debug=True)
