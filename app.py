@@ -62,6 +62,17 @@ def article(id):
     
 
 
+def login_not_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "logged_in" in session:
+            return redirect(url_for("index"))
+        else:
+            return f(*args, **kwargs)
+    return decorated_function
+
+
+
 # Register Form Class
 class RegisterForm(Form):
     name = StringField('Name', [validators.Length(min=1, max=50)])
@@ -76,12 +87,12 @@ class RegisterForm(Form):
 
 # User Register
 @app.route('/register', methods=['GET', 'POST'])
+@login_not_required
+
 def register():
     form = RegisterForm(request.form)
     
-    if is_logged_in:
-        return render_template('home.html')
-    elif request.method == 'POST' and form.validate():
+    if request.method == 'POST' and form.validate():
         name = form.name.data
         email = form.email.data
         username = form.username.data
@@ -109,11 +120,10 @@ def register():
 
 # User login
 @app.route('/login', methods=['GET', 'POST'])
+@login_not_required
 def login():
-    if is_logged_in:
-        return render_template('home.html')
-
-    elif request.method == 'POST':
+    
+    if request.method == 'POST':
         # Get Form Fields
         username = request.form['username']
         password_candidate = request.form['password']
@@ -173,7 +183,7 @@ def dashboard():
     # Get articles
     #result = cur.execute("SELECT * FROM articles")
     # Show articles only from the user logged in 
-    result = cur.execute("SELECT * FROM articles WHERE author = %s", [session['username']])
+    result = cur.execute("SELECT * FROM articles WHERE auther = %s", [session['username']])
 
     articles = cur.fetchall()
 
@@ -195,6 +205,100 @@ def logout():
     flash('You are now logged out', 'success')
     return redirect(url_for('login'))
 
+
+
+# Article Form Class
+class ArticleForm(Form):
+    title = StringField('Title', [validators.Length(min=1, max=200)])
+    body = TextAreaField('Body', [validators.Length(min=30)])
+
+# Add Article
+@app.route('/add_article', methods=['GET', 'POST'])
+@is_logged_in
+def add_article():
+    form = ArticleForm(request.form)
+    if request.method == 'POST' and form.validate():
+        title = form.title.data
+        body = form.body.data
+
+        # Create Cursor
+        cur = mysql.connection.cursor()
+
+        # Execute
+        cur.execute("INSERT INTO articles(title, body, auther) VALUES(%s, %s, %s)",(title, body, session['username']))
+
+        # Commit to DB
+        mysql.connection.commit()
+
+        #Close connection
+        cur.close()
+
+        flash('Article Created', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_article.html', form=form)
+
+
+# Edit Article
+@app.route('/edit_article/<string:id>', methods=['GET', 'POST'])
+@is_logged_in
+def edit_article(id):
+    # Create cursor
+    cur = mysql.connection.cursor()
+
+    # Get article by id
+    result = cur.execute("SELECT * FROM articles WHERE id = %s", [id])
+
+    article = cur.fetchone()
+    cur.close()
+    # Get form
+    form = ArticleForm(request.form)
+
+    # Populate article form fields
+    form.title.data = article['title']
+    form.body.data = article['body']
+
+    if request.method == 'POST' and form.validate():
+        title = request.form['title']
+        body = request.form['body']
+
+        # Create Cursor
+        cur = mysql.connection.cursor()
+        app.logger.info(title)
+        # Execute
+        cur.execute ("UPDATE articles SET title=%s, body=%s WHERE id=%s",(title, body, id))
+        # Commit to DB
+        mysql.connection.commit()
+
+        #Close connection
+        cur.close()
+
+        flash('Article Updated', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('edit_article.html', form=form)
+
+# Delete Article
+@app.route('/delete_article/<string:id>', methods=['POST'])
+@is_logged_in
+def delete_article(id):
+    # Create cursor
+    cur = mysql.connection.cursor()
+
+    # Execute
+    cur.execute("DELETE FROM articles WHERE id = %s", [id])
+
+    # Commit to DB
+    mysql.connection.commit()
+
+    #Close connection
+    cur.close()
+
+    flash('Article Deleted', 'success')
+
+    return redirect(url_for('dashboard'))
 
 
 if __name__ == '__main__':
